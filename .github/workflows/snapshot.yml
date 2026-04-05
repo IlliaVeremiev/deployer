@@ -1,0 +1,61 @@
+name: Snapshot Build
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-publish:
+    name: Build & Publish Snapshot
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Build native (container)
+        run: ./mvnw package -Pnative -Dquarkus.native.container-build=true -Dquarkus.native.additional-build-args="-march=compatibility" -DskipTests
+
+      - name: Stage artifacts
+        run: |
+          # Snapshot version: always lower than any release, but increases over time
+          VERSION="0.0.0~snapshot.$(date -u '+%Y%m%d%H%M%S')"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+          cp target/deployer-runner deployer-linux-x86_64
+
+          mkdir -p pkg/DEBIAN pkg/usr/local/bin
+          cp target/deployer-runner pkg/usr/local/bin/deployer
+          chmod +x pkg/usr/local/bin/deployer
+          cat > pkg/DEBIAN/control <<EOF
+          Package: deployer
+          Version: ${VERSION}
+          Architecture: amd64
+          Maintainer: dev.panikjor
+          Description: Deployer CLI tool (snapshot build)
+          EOF
+          dpkg-deb --build pkg "deployer_${VERSION}_amd64.deb"
+          echo "DEB_FILE=deployer_${VERSION}_amd64.deb" >> $GITHUB_ENV
+
+      - name: Publish snapshot release
+        run: |
+          gh release delete snapshot --yes --cleanup-tag 2>/dev/null || true
+          gh release create snapshot \
+            --title "Snapshot ($(date -u '+%Y-%m-%d %H:%M UTC'))" \
+            --notes "Latest build from \`main\` branch. Commit: ${{ github.sha }}" \
+            --prerelease \
+            deployer-linux-x86_64 \
+            "$DEB_FILE"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update apt repository (snapshot channel)
+        run: bash .github/scripts/update-apt-repo.sh snapshot "$DEB_FILE"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

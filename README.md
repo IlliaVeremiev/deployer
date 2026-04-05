@@ -1,4 +1,31 @@
-# code-with-quarkus
+# deployer
+
+## Installation
+
+### Ubuntu / Debian
+
+Add the apt repository and install:
+
+```bash
+echo "deb [trusted=yes arch=amd64] https://IlliaVeremiev.github.io/deployer stable main" \
+  | sudo tee /etc/apt/sources.list.d/deployer.list
+sudo apt update
+sudo apt install deployer
+```
+
+To update later:
+
+```bash
+sudo apt update && sudo apt upgrade deployer
+```
+
+> **Latest (snapshot):** To always get the build from the latest commit on `main`, use `snapshot` instead of `stable` in the repository URL. Snapshot builds update on every push and may be unstable.
+> ```bash
+> echo "deb [trusted=yes arch=amd64] https://IlliaVeremiev.github.io/deployer snapshot main" \
+>   | sudo tee /etc/apt/sources.list.d/deployer.list
+> ```
+
+---
 
 This project uses Quarkus, the Supersonic Subatomic Java Framework.
 

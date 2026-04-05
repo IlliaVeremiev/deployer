@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  build-and-publish:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set project version
+        run: ./mvnw versions:set -DnewVersion=${{ env.VERSION }} -DgenerateBackupPoms=false
+
+      - name: Build native (container)
+        run: ./mvnw package -Pnative -Dquarkus.native.container-build=true -Dquarkus.native.additional-build-args="-march=compatibility" -DskipTests
+
+      - name: Stage artifacts
+        run: |
+          cp target/deployer-runner deployer-linux-x86_64
+
+          mkdir -p pkg/DEBIAN pkg/usr/local/bin
+          cp target/deployer-runner pkg/usr/local/bin/deployer
+          chmod +x pkg/usr/local/bin/deployer
+          cat > pkg/DEBIAN/control <<EOF
+          Package: deployer
+          Version: ${{ env.VERSION }}
+          Architecture: amd64
+          Maintainer: dev.panikjor
+          Description: Deployer CLI tool
+          EOF
+          dpkg-deb --build pkg "deployer_${{ env.VERSION }}_amd64.deb"
+          echo "DEB_FILE=deployer_${{ env.VERSION }}_amd64.deb" >> $GITHUB_ENV
+
+      - name: Publish release
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes \
+            deployer-linux-x86_64 \
+            "$DEB_FILE"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update apt repository (stable channel)
+        run: bash .github/scripts/update-apt-repo.sh stable "$DEB_FILE"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

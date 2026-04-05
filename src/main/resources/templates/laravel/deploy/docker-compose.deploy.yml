@@ -1,0 +1,18 @@
+services:
+    {{APP_NAME}}:
+      image: ${IMAGE_NAME}
+      restart: unless-stopped
+      env_file:
+        - .env.production
+      networks:
+        - proxy
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.{{APP_NAME}}.rule=Host(`${APP_NAME}.${DOMAIN_ROOT}`)"
+        - "traefik.http.routers.{{APP_NAME}}.entrypoints=websecure"
+        - "traefik.http.routers.{{APP_NAME}}.tls.certresolver=letsencrypt"
+        - "traefik.http.services.{{APP_NAME}}.loadbalancer.server.port=80"
+
+networks:
+  proxy:
+    external: true

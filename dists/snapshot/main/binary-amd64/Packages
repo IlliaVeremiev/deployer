@@ -1,12 +1,12 @@
 Package: deployer
 Architecture: amd64
-Version: 0.0.0~snapshot.20260406000448
+Version: 0.0.0~snapshot.20260406092600
 Maintainer: dev.panikjor
-Filename: pool/snapshot/deployer_0.0.0~snapshot.20260406000448_amd64.deb
-Size: 12010876
-MD5sum: 9ce62b87fa3692a4a4fc1c2e7275c842
-SHA1: 6a8dbd76b9a02e4e146da7b28fa5d57e1568b659
-SHA256: 369cf192fc03472c2aa6e08e2ade8f8c82011290a1279e81a7cc46cc10fc63ae
-SHA512: da57f3816d7a6ea278c536fe6fa79e9da9b0548d1973d35dc277a643487cb0c61650f8d418b64fbb00879fa4c2d7acc1baf13404cd565c01b02a647810f0f286
+Filename: pool/snapshot/deployer_0.0.0~snapshot.20260406092600_amd64.deb
+Size: 12111336
+MD5sum: e3b52a1dbf22f371e2c374ec909a0861
+SHA1: 9e1bd3dad118b41316fffbf7e0f18d2c6f2b5735
+SHA256: f5ecada8c9448de03c3a7a940610371779a381b857e0ba6b57e3cffd52de9571
+SHA512: 9297b4de6875c25c00a4bfb6e88a971254a21f803e769fbcc8e9bcb4e873f944b75470f209a64be4d1e2acccf42b7ab9b006365f1a7cfb019166e80d5a84f724
 Description: Deployer CLI tool (snapshot build)
 

@@ -17,8 +17,13 @@ public class PortainerClient {
     private final String token;
     private final int endpointId;
     private final HttpClient http;
+    private final boolean verbose;
 
     public PortainerClient(String baseUrl, String token, int endpointId, java.io.PrintWriter warnings) throws IllegalArgumentException {
+        this(baseUrl, token, endpointId, warnings, false);
+    }
+
+    public PortainerClient(String baseUrl, String token, int endpointId, java.io.PrintWriter warnings, boolean verbose) throws IllegalArgumentException {
         if (baseUrl == null || baseUrl.isEmpty()) throw new IllegalArgumentException("portainer-url is required");
         if (!baseUrl.startsWith("http://") && !baseUrl.startsWith("https://")) {
             throw new IllegalArgumentException("portainer-url must be a valid URL (http:// or https://)");
@@ -30,21 +35,42 @@ public class PortainerClient {
         this.baseUrl = baseUrl.replaceAll("/+$", "");
         this.token = token;
         this.endpointId = endpointId;
+        this.verbose = verbose;
         this.http = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(30))
                 .build();
     }
 
+    private void logRequest(String method, String url) {
+        if (verbose) System.err.println("[verbose] --> " + method + " " + url);
+    }
+
+    private void logResponse(HttpResponse<String> resp) {
+        if (verbose) {
+            System.err.println("[verbose] <-- HTTP " + resp.statusCode());
+            String body = resp.body();
+            if (body != null && !body.isEmpty()) System.err.println("[verbose] " + body);
+        }
+    }
+
     /** Find a stack by name. Returns null if not found. */
     public Stack findStack(String name) throws IOException, InterruptedException {
+        String url = baseUrl + "/api/stacks";
+        logRequest("GET", url);
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + "/api/stacks"))
+                .uri(URI.create(url))
                 .header("X-API-Key", token)
                 .GET()
                 .timeout(Duration.ofSeconds(30))
                 .build();
 
-        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp;
+        try {
+            resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        } catch (java.net.ConnectException e) {
+            throw new java.net.ConnectException("Cannot connect to Portainer at " + url + " — " + e.getMessage());
+        }
+        logResponse(resp);
         if (resp.statusCode() >= 400) {
             throw new IOException("Portainer API error listing stacks: HTTP " + resp.statusCode());
         }
@@ -58,6 +84,7 @@ public class PortainerClient {
     public void createStack(String name, String composeContent, List<EnvVar> env) throws IOException, InterruptedException {
         String body = buildCreatePayload(name, composeContent, env);
         String url = baseUrl + "/api/stacks/create/standalone/string?endpointId=" + endpointId;
+        logRequest("POST", url);
 
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -67,7 +94,13 @@ public class PortainerClient {
                 .timeout(Duration.ofSeconds(30))
                 .build();
 
-        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp;
+        try {
+            resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        } catch (java.net.ConnectException e) {
+            throw new java.net.ConnectException("Cannot connect to Portainer at " + url + " — " + e.getMessage());
+        }
+        logResponse(resp);
         if (resp.statusCode() >= 400) {
             throw new IOException("Portainer API error creating stack: HTTP " + resp.statusCode() + " — " + resp.body());
         }
@@ -77,6 +110,7 @@ public class PortainerClient {
     public void updateStack(int id, String composeContent, List<EnvVar> env) throws IOException, InterruptedException {
         String body = buildUpdatePayload(composeContent, env);
         String url = baseUrl + "/api/stacks/" + id + "?endpointId=" + endpointId;
+        logRequest("PUT", url);
 
         HttpRequest req = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -86,7 +120,13 @@ public class PortainerClient {
                 .timeout(Duration.ofSeconds(30))
                 .build();
 
-        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp;
+        try {
+            resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        } catch (java.net.ConnectException e) {
+            throw new java.net.ConnectException("Cannot connect to Portainer at " + url + " — " + e.getMessage());
+        }
+        logResponse(resp);
         if (resp.statusCode() >= 400) {
             throw new IOException("Portainer API error updating stack: HTTP " + resp.statusCode() + " — " + resp.body());
         }
@@ -106,17 +146,45 @@ public class PortainerClient {
 
     private List<Stack> parseStacks(String json) {
         List<Stack> stacks = new ArrayList<>();
-        // Match objects containing "Id" and "Name" fields (order may vary)
-        Pattern p = Pattern.compile("\\{[^}]*\"Id\"\\s*:\\s*(\\d+)[^}]*\"Name\"\\s*:\\s*\"([^\"]+)\"[^}]*\\}|\\{[^}]*\"Name\"\\s*:\\s*\"([^\"]+)\"[^}]*\"Id\"\\s*:\\s*(\\d+)[^}]*\\}");
-        Matcher m = p.matcher(json);
-        while (m.find()) {
-            if (m.group(1) != null) {
-                stacks.add(new Stack(Integer.parseInt(m.group(1)), m.group(2)));
-            } else {
-                stacks.add(new Stack(Integer.parseInt(m.group(4)), m.group(3)));
+        // Extract top-level objects from the JSON array, then parse Id and Name from each
+        List<String> objects = extractTopLevelObjects(json);
+        Pattern idPat = Pattern.compile("\"Id\"\\s*:\\s*(\\d+)");
+        Pattern namePat = Pattern.compile("\"Name\"\\s*:\\s*\"([^\"]+)\"");
+        for (String obj : objects) {
+            Matcher idM = idPat.matcher(obj);
+            Matcher nameM = namePat.matcher(obj);
+            if (idM.find() && nameM.find()) {
+                stacks.add(new Stack(Integer.parseInt(idM.group(1)), nameM.group(1)));
             }
         }
         return stacks;
+    }
+
+    /** Extract the text of each top-level JSON object from an array, handling nested objects/arrays. */
+    private List<String> extractTopLevelObjects(String json) {
+        List<String> result = new ArrayList<>();
+        int depth = 0;
+        int start = -1;
+        boolean inString = false;
+        boolean escape = false;
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (escape) { escape = false; continue; }
+            if (c == '\\' && inString) { escape = true; continue; }
+            if (c == '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (c == '{') {
+                if (depth == 0) start = i;
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0 && start >= 0) {
+                    result.add(json.substring(start, i + 1));
+                    start = -1;
+                }
+            }
+        }
+        return result;
     }
 
     private String buildCreatePayload(String name, String composeContent, List<EnvVar> env) {

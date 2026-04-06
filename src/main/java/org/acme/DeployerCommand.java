@@ -64,6 +64,7 @@ public class DeployerCommand implements Runnable {
             description = "Suppress progress output")
     boolean quiet;
 
+
     /** Resolved global config (lazy-loaded once by subcommands) */
     private Map<String, String> globalConfig;
 
@@ -105,6 +106,10 @@ public class DeployerCommand implements Runnable {
 
     /** Build a Portainer client from current resolved config */
     public PortainerClient newPortainerClient() throws IllegalArgumentException {
+        return newPortainerClient(false);
+    }
+
+    public PortainerClient newPortainerClient(boolean verbose) throws IllegalArgumentException {
         String url = resolvedPortainerUrl();
         String token = portainerToken();
         String endpointStr = resolvedPortainerEndpoint();
@@ -121,7 +126,7 @@ public class DeployerCommand implements Runnable {
         }
 
         PrintWriter warnings = new PrintWriter(System.err, true);
-        return new PortainerClient(url, token, endpointId, warnings);
+        return new PortainerClient(url, token, endpointId, warnings, verbose);
     }
 
     /** Build the list of Portainer env vars from project config + .env.production */
@@ -151,6 +156,10 @@ public class DeployerCommand implements Runnable {
 
     /** Shared deploy logic used by DeployCommand and ShipCommand */
     public void runDeploy(String cwd, org.acme.config.ProjectConfig cfg) throws Exception {
+        runDeploy(cwd, cfg, false);
+    }
+
+    public void runDeploy(String cwd, org.acme.config.ProjectConfig cfg, boolean verbose) throws Exception {
         String domainRootValue = resolvedDomainRoot();
         if (domainRootValue.isEmpty()) throw new IllegalArgumentException("--domain-root is required (or set DEPLOYER_DOMAIN_ROOT)");
 
@@ -158,7 +167,7 @@ public class DeployerCommand implements Runnable {
         Map<String, String> envVars = ConfigLoader.loadEnvFile(cwd);
         List<EnvVar> portainerEnv = buildPortainerEnv(cfg, envVars, domainRootValue);
 
-        PortainerClient client = newPortainerClient();
+        PortainerClient client = newPortainerClient(verbose);
         client.deploy(cfg.stackName, composeContent, portainerEnv);
     }
 

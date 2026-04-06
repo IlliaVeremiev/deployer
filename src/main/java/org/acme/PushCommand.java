@@ -45,7 +45,9 @@ public class PushCommand implements Runnable {
             RegistryRunner.login(registryHost, username, password, parent.progress());
             RegistryRunner.push(cfg.imageName, parent.progress());
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            String msg = e.getMessage();
+            System.err.println("Error: " + (msg != null ? msg : e.getClass().getSimpleName() + " (no message)"));
+            if (System.getenv("DEPLOYER_DEBUG") != null) e.printStackTrace(System.err);
             System.exit(1);
         }
     }

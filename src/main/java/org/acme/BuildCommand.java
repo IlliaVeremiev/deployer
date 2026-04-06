@@ -28,7 +28,9 @@ public class BuildCommand implements Runnable {
             }
             DockerRunner.build(cwd, cfg.imageName, cfg.buildArgs, parent.progress());
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            String msg = e.getMessage();
+            System.err.println("Error: " + (msg != null ? msg : e.getClass().getSimpleName() + " (no message)"));
+            if (System.getenv("DEPLOYER_DEBUG") != null) e.printStackTrace(System.err);
             System.exit(1);
         }
     }

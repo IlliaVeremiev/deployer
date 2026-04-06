@@ -3,6 +3,7 @@ package org.acme;
 import org.acme.config.ConfigLoader;
 import org.acme.config.ProjectConfig;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 import java.util.List;
@@ -12,6 +13,10 @@ public class DeployCommand implements Runnable {
 
     @ParentCommand
     DeployerCommand parent;
+
+    @Option(names = {"-v", "--verbose"},
+            description = "Print HTTP request URLs, response status, and response bodies")
+    boolean verbose;
 
     @Override
     public void run() {
@@ -33,13 +38,15 @@ public class DeployCommand implements Runnable {
                 parent.progress().printf("🚀 Deploying %s → %s%n", cfg.stackName, liveUrl);
             }
 
-            parent.runDeploy(cwd, cfg);
+            parent.runDeploy(cwd, cfg, verbose);
 
             if (parent.progress() != null) {
                 parent.progress().printf("✅ Deployed! Live at: %s%n", liveUrl);
             }
         } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
+            String msg = e.getMessage();
+            System.err.println("Error: " + (msg != null ? msg : e.getClass().getSimpleName() + " (no message)"));
+            if (System.getenv("DEPLOYER_DEBUG") != null) e.printStackTrace(System.err);
             System.exit(1);
         }
     }

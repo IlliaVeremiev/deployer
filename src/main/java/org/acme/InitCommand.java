@@ -39,6 +39,11 @@ public class InitCommand implements Runnable {
             new TemplateFile("templates/java/Dockerfile", "Dockerfile"),
             new TemplateFile("templates/java/deploy/dot-deploy", "deploy/.deploy"),
             new TemplateFile("templates/java/deploy/docker-compose.deploy.yml", "deploy/docker-compose.deploy.yml")
+        ),
+        "nuxt", List.of(
+            new TemplateFile("templates/nuxt/Dockerfile", "Dockerfile"),
+            new TemplateFile("templates/nuxt/deploy/dot-deploy", "deploy/.deploy"),
+            new TemplateFile("templates/nuxt/deploy/docker-compose.deploy.yml", "deploy/docker-compose.deploy.yml")
         )
     );
 
@@ -47,7 +52,7 @@ public class InitCommand implements Runnable {
     @ParentCommand
     DeployerCommand parent;
 
-    @Option(names = {"-t", "--template"}, description = "Project template: node, laravel, java, list", defaultValue = "node")
+    @Option(names = {"-t", "--template"}, description = "Project template: node, laravel, java, nuxt, list", defaultValue = "node")
     String template;
 
     @Option(names = {"-n", "--name"}, description = "App name/subdomain slug (default: directory name)")
@@ -60,6 +65,7 @@ public class InitCommand implements Runnable {
             System.out.println("  node    — Node.js (port 3000)");
             System.out.println("  laravel — Laravel/PHP (port 80)");
             System.out.println("  java    — Java/Gradle (port 8080)");
+            System.out.println("  nuxt    — Nuxt/Vue.js (port 80)");
             return;
         }
 

@@ -3,14 +3,16 @@ package org.acme;
 import io.quarkus.picocli.runtime.annotations.TopCommand;
 import jakarta.enterprise.context.Dependent;
 import org.acme.config.ConfigLoader;
+import org.acme.config.MonoConfig;
+import org.acme.config.ServiceConfig;
 import org.acme.portainer.EnvVar;
 import org.acme.portainer.PortainerClient;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
-import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +66,6 @@ public class DeployerCommand implements Runnable {
             description = "Suppress progress output")
     boolean quiet;
 
-
     /** Resolved global config (lazy-loaded once by subcommands) */
     private Map<String, String> globalConfig;
 
@@ -75,36 +76,31 @@ public class DeployerCommand implements Runnable {
         return globalConfig;
     }
 
-    /** Resolve a value: CLI/env flag > config file */
     public String resolve(String flagValue, String configKey) {
         return ConfigLoader.resolve(flagValue, configKey, globalConfig());
     }
 
-    /** Get portainer token from env var or config file (never a CLI flag) */
     public String portainerToken() {
         String env = System.getenv("DEPLOYER_PORTAINER_TOKEN");
         if (env != null && !env.isEmpty()) return env;
         return globalConfig().getOrDefault("portainer-token", "");
     }
 
-    /** Get registry password from env var or config file (never a CLI flag) */
     public String registryPassword() {
         String env = System.getenv("DEPLOYER_REGISTRY_PASSWORD");
         if (env != null && !env.isEmpty()) return env;
         return globalConfig().getOrDefault("registry-password", "");
     }
 
-    public String resolvedPortainerUrl() { return resolve(portainerUrl, "portainer-url"); }
+    public String resolvedPortainerUrl()      { return resolve(portainerUrl, "portainer-url"); }
     public String resolvedPortainerEndpoint() { return resolve(portainerEndpoint, "portainer-endpoint"); }
-    public String resolvedDomainRoot() { return resolve(domainRoot, "domain-root"); }
-    public String resolvedRegistryUsername() { return resolve(registryUsername, "registry-username"); }
+    public String resolvedDomainRoot()        { return resolve(domainRoot, "domain-root"); }
+    public String resolvedRegistryUsername()  { return resolve(registryUsername, "registry-username"); }
 
-    /** Get progress print stream: null if --quiet, otherwise System.out */
     public java.io.PrintStream progress() {
         return quiet ? null : System.out;
     }
 
-    /** Build a Portainer client from current resolved config */
     public PortainerClient newPortainerClient() throws IllegalArgumentException {
         return newPortainerClient(false);
     }
@@ -129,9 +125,9 @@ public class DeployerCommand implements Runnable {
         return new PortainerClient(url, token, endpointId, warnings, verbose);
     }
 
-    /** Build the list of Portainer env vars from project config + .env.production */
+    /** Build Portainer env vars from .env.production + managed deployer vars. */
     public List<EnvVar> buildPortainerEnv(
-            org.acme.config.ProjectConfig cfg,
+            ServiceConfig svc,
             Map<String, String> envVars,
             String domainRootValue) {
 
@@ -146,29 +142,29 @@ public class DeployerCommand implements Runnable {
             }
         }
 
-        result.add(new EnvVar("IMAGE_NAME", cfg.imageName));
-        result.add(new EnvVar("APP_NAME", cfg.appName));
+        result.add(new EnvVar("IMAGE_NAME", svc.imageName));
+        result.add(new EnvVar("APP_NAME", svc.route));
         result.add(new EnvVar("DOMAIN_ROOT", domainRootValue));
 
         result.sort((a, b) -> a.name().compareTo(b.name()));
         return result;
     }
 
-    /** Shared deploy logic used by DeployCommand and ShipCommand */
-    public void runDeploy(String cwd, org.acme.config.ProjectConfig cfg) throws Exception {
-        runDeploy(cwd, cfg, false);
+    /** Shared deploy logic for a single service. Used by DeployCommand and ShipCommand. */
+    public void runDeploy(MonoConfig mono, ServiceConfig svc) throws Exception {
+        runDeploy(mono, svc, false);
     }
 
-    public void runDeploy(String cwd, org.acme.config.ProjectConfig cfg, boolean verbose) throws Exception {
+    public void runDeploy(MonoConfig mono, ServiceConfig svc, boolean verbose) throws Exception {
         String domainRootValue = resolvedDomainRoot();
         if (domainRootValue.isEmpty()) throw new IllegalArgumentException("--domain-root is required (or set DEPLOYER_DOMAIN_ROOT)");
 
-        String composeContent = ConfigLoader.readCompose(cwd);
-        Map<String, String> envVars = ConfigLoader.loadEnvFile(cwd);
-        List<EnvVar> portainerEnv = buildPortainerEnv(cfg, envVars, domainRootValue);
+        String composeContent = Files.readString(svc.resolveComposeFile(mono.deployYmlDir));
+        Map<String, String> envVars = ConfigLoader.loadEnvFile(svc.resolveEnvFile(mono.deployYmlDir));
+        List<EnvVar> portainerEnv = buildPortainerEnv(svc, envVars, domainRootValue);
 
         PortainerClient client = newPortainerClient(verbose);
-        client.deploy(cfg.stackName, composeContent, portainerEnv);
+        client.deploy(svc.stackName(mono.stack), composeContent, portainerEnv);
     }
 
     @Override

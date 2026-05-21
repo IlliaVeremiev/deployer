@@ -1,14 +1,15 @@
 package org.acme;
 
-import org.acme.config.ConfigLoader;
-import org.acme.config.ProjectConfig;
+import org.acme.config.MonoConfig;
+import org.acme.config.MonoConfigLoader;
+import org.acme.config.ServiceConfig;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 
 import java.util.List;
 
-@Command(name = "deploy", description = "Create or update Portainer stack", mixinStandardHelpOptions = true)
+@Command(name = "deploy", description = "Create or update Portainer stack(s)", mixinStandardHelpOptions = true)
 public class DeployCommand implements Runnable {
 
     @ParentCommand
@@ -18,12 +19,16 @@ public class DeployCommand implements Runnable {
             description = "Print HTTP request URLs, response status, and response bodies")
     boolean verbose;
 
+    @Option(names = {"--service"}, description = "Service name to deploy (default: all services)")
+    String serviceName;
+
     @Override
     public void run() {
         try {
             String cwd = System.getProperty("user.dir");
-            ProjectConfig cfg = ConfigLoader.loadProjectConfig(cwd);
-            List<String> errors = cfg.validate();
+            MonoConfig mono = MonoConfigLoader.load(cwd);
+
+            List<String> errors = mono.validate();
             if (!errors.isEmpty()) {
                 System.err.println("Configuration errors:");
                 errors.forEach(e -> System.err.println("  • " + e));
@@ -32,16 +37,18 @@ public class DeployCommand implements Runnable {
             }
 
             String domainRoot = parent.resolvedDomainRoot();
-            String liveUrl = "https://" + cfg.appName + "." + domainRoot;
+            List<ServiceConfig> services = resolveServices(mono);
 
-            if (parent.progress() != null) {
-                parent.progress().printf("🚀 Deploying %s → %s%n", cfg.stackName, liveUrl);
-            }
-
-            parent.runDeploy(cwd, cfg, verbose);
-
-            if (parent.progress() != null) {
-                parent.progress().printf("✅ Deployed! Live at: %s%n", liveUrl);
+            for (ServiceConfig svc : services) {
+                String liveUrl = "https://" + svc.route + "." + domainRoot;
+                if (parent.progress() != null) {
+                    if (services.size() > 1) parent.progress().printf("%n▶ Deploying service: %s%n", svc.id);
+                    parent.progress().printf("🚀 Deploying %s → %s%n", svc.stackName(mono.stack), liveUrl);
+                }
+                parent.runDeploy(mono, svc, verbose);
+                if (parent.progress() != null) {
+                    parent.progress().printf("✅ Deployed! Live at: %s%n", liveUrl);
+                }
             }
         } catch (Exception e) {
             String msg = e.getMessage();
@@ -49,5 +56,14 @@ public class DeployCommand implements Runnable {
             if (System.getenv("DEPLOYER_DEBUG") != null) e.printStackTrace(System.err);
             System.exit(1);
         }
+    }
+
+    private List<ServiceConfig> resolveServices(MonoConfig mono) {
+        if (serviceName != null) {
+            ServiceConfig svc = mono.services.get(serviceName);
+            if (svc == null) throw new IllegalArgumentException("Service '" + serviceName + "' not found in deploy.yml");
+            return List.of(svc);
+        }
+        return List.copyOf(mono.services.values());
     }
 }

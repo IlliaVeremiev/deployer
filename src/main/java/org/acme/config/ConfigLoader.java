@@ -11,40 +11,10 @@ import java.util.Map;
 
 public class ConfigLoader {
 
-    /** Load the project .deploy file from deploy/.deploy */
-    public static ProjectConfig loadProjectConfig(String projectDir) throws IOException {
-        Path deployFile = Paths.get(projectDir, "deploy", ".deploy");
-        if (!Files.exists(deployFile)) {
-            throw new IOException("deploy/.deploy not found in " + projectDir);
-        }
-        Map<String, String> vars = parseDotenv(Files.readString(deployFile));
-
-        ProjectConfig cfg = new ProjectConfig();
-        cfg.stackName = vars.getOrDefault("STACK_NAME", "");
-        cfg.imageName = vars.getOrDefault("IMAGE_NAME", "");
-        cfg.appName = vars.getOrDefault("APP_NAME", "");
-
-        String buildArgsRaw = vars.getOrDefault("BUILD_ARGS", "").trim();
-        if (!buildArgsRaw.isEmpty()) {
-            for (String arg : buildArgsRaw.split(",")) {
-                arg = arg.trim();
-                if (!arg.isEmpty()) cfg.buildArgs.add(arg);
-            }
-        }
-        return cfg;
-    }
-
-    /** Load deploy/.env.production — returns empty map if file doesn't exist */
-    public static Map<String, String> loadEnvFile(String projectDir) throws IOException {
-        Path envFile = Paths.get(projectDir, "deploy", ".env.production");
+    /** Load .env.production from an explicit path. Returns empty map if file doesn't exist. */
+    public static Map<String, String> loadEnvFile(Path envFile) throws IOException {
         if (!Files.exists(envFile)) return new LinkedHashMap<>();
         return parseDotenv(Files.readString(envFile));
-    }
-
-    /** Read deploy/docker-compose.deploy.yml as a raw string */
-    public static String readCompose(String projectDir) throws IOException {
-        Path composePath = Paths.get(projectDir, "deploy", "docker-compose.deploy.yml");
-        return Files.readString(composePath);
     }
 
     /**

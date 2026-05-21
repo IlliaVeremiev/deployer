@@ -1,7 +1,7 @@
 package org.acme;
 
 import io.quarkus.picocli.runtime.annotations.TopCommand;
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.Dependent;
 import org.acme.config.ConfigLoader;
 import org.acme.portainer.EnvVar;
 import org.acme.portainer.PortainerClient;
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @TopCommand
-@ApplicationScoped
+@Dependent
 @Command(
     name = "deployer",
     description = "Deploy Docker projects to Portainer",

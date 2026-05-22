@@ -19,6 +19,9 @@ public class BuildCommand implements Runnable {
     @Option(names = {"--service"}, description = "Service name to build (default: all services)")
     String serviceName;
 
+    @Option(names = {"--debug"}, description = "Run docker build with --debug flag")
+    boolean debug;
+
     @Override
     public void run() {
         try {
@@ -44,6 +47,7 @@ public class BuildCommand implements Runnable {
                         svc.resolveDockerfile(mono.deployYmlDir),
                         svc.imageName,
                         svc.buildArgs,
+                        debug,
                         parent.progress()
                 );
             }

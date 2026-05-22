@@ -14,6 +14,7 @@ public class DockerRunner {
             Path dockerfilePath,
             String imageName,
             List<String> buildArgs,
+            boolean debug,
             PrintStream out) throws IOException, InterruptedException {
 
         if (out != null) out.printf("🔨 Building %s...%n", imageName);
@@ -23,11 +24,17 @@ public class DockerRunner {
                 "--file", dockerfilePath.toAbsolutePath().toString(),
                 "--tag", imageName
         ));
+        if (debug) cmd.add("--debug");
         for (String arg : buildArgs) {
             cmd.add("--build-arg");
             cmd.add(arg);
         }
         cmd.add(contextDir.toAbsolutePath().toString());
+
+        if (out != null) {
+            out.printf("   $ %s%n", String.join(" ", cmd));
+            out.printf("   context: %s%n", contextDir.toAbsolutePath());
+        }
 
         ProcessBuilder pb = new ProcessBuilder(cmd)
                 .inheritIO();

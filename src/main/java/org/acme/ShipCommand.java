@@ -68,8 +68,9 @@ public class ShipCommand implements Runnable {
                 ServiceConfig svc = services.get(i);
                 String liveUrl = "https://" + svc.route + "." + domainRoot;
 
-                if (parent.progress() != null && total > 1) {
-                    parent.progress().printf("[%d/%d] %s: %s%n", i + 1, total, svc.id, svc.stackName(mono.stack));
+                if (parent.progress() != null) {
+                    if (total > 1) parent.progress().printf("[%d/%d] %s: %s%n", i + 1, total, svc.id, svc.stackName(mono.stack));
+                    parent.logServiceFiles(mono, svc, true, true);
                 }
 
                 // 1. Build

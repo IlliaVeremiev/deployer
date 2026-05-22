@@ -44,6 +44,7 @@ public class DeployCommand implements Runnable {
                 if (parent.progress() != null) {
                     if (services.size() > 1) parent.progress().printf("%n▶ Deploying service: %s%n", svc.id);
                     parent.progress().printf("🚀 Deploying %s → %s%n", svc.stackName(mono.stack), liveUrl);
+                    parent.logServiceFiles(mono, svc, false, true);
                 }
                 parent.runDeploy(mono, svc, verbose);
                 if (parent.progress() != null) {

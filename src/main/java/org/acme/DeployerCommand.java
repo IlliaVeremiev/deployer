@@ -150,6 +150,30 @@ public class DeployerCommand implements Runnable {
         return result;
     }
 
+    /**
+     * Print resolved file paths and build args for a service.
+     * showBuild=true: Dockerfile, context, build args
+     * showDeploy=true: compose file, env file
+     */
+    public void logServiceFiles(MonoConfig mono, ServiceConfig svc, boolean showBuild, boolean showDeploy) {
+        java.io.PrintStream out = progress();
+        if (out == null) return;
+        java.nio.file.Path base = mono.deployYmlDir;
+        if (showBuild) {
+            out.printf("   📄 Dockerfile  : %s%n", base.relativize(svc.resolveDockerfile(base)));
+            out.printf("   📁 Context     : %s%n", base.relativize(svc.resolveContextRoot(base)));
+            out.printf("   🔧 Build args  : %s%n",
+                    svc.buildArgs.isEmpty() ? "(none)" : String.join(", ", svc.buildArgs));
+        }
+        if (showDeploy) {
+            out.printf("   📋 Compose     : %s%n", base.relativize(svc.resolveComposeFile(base)));
+            java.nio.file.Path envPath = svc.resolveEnvFile(base);
+            boolean envExists = Files.exists(envPath);
+            out.printf("   🔐 Env file    : %s%s%n",
+                    base.relativize(envPath), envExists ? "" : " (not found — optional)");
+        }
+    }
+
     /** Shared deploy logic for a single service. Used by DeployCommand and ShipCommand. */
     public void runDeploy(MonoConfig mono, ServiceConfig svc) throws Exception {
         runDeploy(mono, svc, false);
@@ -161,6 +185,16 @@ public class DeployerCommand implements Runnable {
 
         String composeContent = Files.readString(svc.resolveComposeFile(mono.deployYmlDir));
         Map<String, String> envVars = ConfigLoader.loadEnvFile(svc.resolveEnvFile(mono.deployYmlDir));
+
+        if (verbose && progress() != null) {
+            if (envVars.isEmpty()) {
+                progress().println("   🔐 Env vars    : (none)");
+            } else {
+                progress().println("   🔐 Env vars    :");
+                envVars.forEach((k, v) -> progress().printf("      %s=%s%n", k, v));
+            }
+        }
+
         List<EnvVar> portainerEnv = buildPortainerEnv(svc, envVars, domainRootValue);
 
         PortainerClient client = newPortainerClient(verbose);

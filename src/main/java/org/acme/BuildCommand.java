@@ -35,8 +35,9 @@ public class BuildCommand implements Runnable {
 
             List<ServiceConfig> services = resolveServices(mono);
             for (ServiceConfig svc : services) {
-                if (parent.progress() != null && services.size() > 1) {
-                    parent.progress().printf("%n▶ Building service: %s%n", svc.id);
+                if (parent.progress() != null) {
+                    if (services.size() > 1) parent.progress().printf("%n▶ Building service: %s%n", svc.id);
+                    parent.logServiceFiles(mono, svc, true, false);
                 }
                 DockerRunner.build(
                         svc.resolveContextRoot(mono.deployYmlDir),

@@ -164,6 +164,10 @@ public class DeployerCommand implements Runnable {
             out.printf("   📁 Context     : %s%n", base.relativize(svc.resolveContextRoot(base)));
             out.printf("   🔧 Build args  : %s%n",
                     svc.buildArgs.isEmpty() ? "(none)" : String.join(", ", svc.buildArgs));
+            java.nio.file.Path buildEnvPath = svc.resolveEnvFile(base);
+            boolean buildEnvExists = Files.exists(buildEnvPath);
+            out.printf("   🔐 Build env   : %s%s%n",
+                    base.relativize(buildEnvPath), buildEnvExists ? "" : " (not found — optional)");
         }
         if (showDeploy) {
             out.printf("   📋 Compose     : %s%n", base.relativize(svc.resolveComposeFile(base)));

@@ -9,7 +9,8 @@ RUN pnpm i
 
 COPY . ./
 
-RUN pnpm run build
+RUN --mount=type=secret,id=envfile,target=/app/.env.production,required=false \
+    pnpm run build
 
 FROM node:22-alpine
 WORKDIR /app

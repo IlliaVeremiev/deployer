@@ -3,7 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN --mount=type=secret,id=envfile,target=/app/.env.production,required=false \
+    npm run build
 
 FROM node:22-alpine
 WORKDIR /app

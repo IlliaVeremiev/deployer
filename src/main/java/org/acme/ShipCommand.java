@@ -82,6 +82,7 @@ public class ShipCommand implements Runnable {
                         svc.resolveDockerfile(mono.deployYmlDir),
                         svc.imageName,
                         svc.buildArgs,
+                        svc.resolveEnvFile(mono.deployYmlDir),
                         debug,
                         parent.progress()
                 );
